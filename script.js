@@ -1,7 +1,11 @@
+/**
+ * Smart Calculator Logic
+ * Handles standard operations and custom multipliers (H, K, M).
+ */
 class Calculator {
-  constructor(previousOperandTextElement, currentOperandTextElement) {
-    this.previousOperandTextElement = previousOperandTextElement;
-    this.currentOperandTextElement = currentOperandTextElement;
+  constructor(previousOperandElement, currentOperandElement) {
+    this.previousOperandElement = previousOperandElement;
+    this.currentOperandElement = currentOperandElement;
     this.clear();
   }
 
@@ -16,151 +20,152 @@ class Calculator {
   }
 
   appendNumber(number) {
+    // Prevent multiple decimals
     if (number === '.' && this.currentOperand.includes('.')) return;
     this.currentOperand = this.currentOperand.toString() + number.toString();
   }
 
-  // Handles K (Thousands), M (Millions), H (Hundreds)
-  chooseSpecialOperation(specialOperation) {
-    // Prevent adding multiple letters (e.g., 5KK)
-    const str = this.currentOperand.toString();
-    if (/[KMH]/.test(str)) return; 
-    
-    this.currentOperand = str + specialOperation;
+  /**
+   * Instantly evaluates the multiplier and updates the current operand.
+   * e.g., typing '5' then 'K' immediately makes it '5000'
+   */
+  applyMultiplier(multiplier) {
+    if (this.currentOperand === '') return;
+
+    const currentNum = parseFloat(this.currentOperand);
+    if (isNaN(currentNum)) return;
+
+    let result;
+    switch (multiplier) {
+      case 'H': result = currentNum * 100; break;
+      case 'K': result = currentNum * 1000; break;
+      case 'M': result = currentNum * 1000000; break;
+      default: return;
+    }
+
+    // Convert back to string for state management
+    this.currentOperand = result.toString();
   }
 
   chooseOperation(operation) {
     if (this.currentOperand === '') return;
+    
+    // If we already have a previous operand, compute first before starting new operation
     if (this.previousOperand !== '') {
       this.compute();
     }
+    
     this.operation = operation;
     this.previousOperand = this.currentOperand;
     this.currentOperand = '';
   }
 
-  // Helper to convert "2.5K" into 2500
-  parseSpecialValue(val) {
-    const strVal = val.toString();
-    const numberVal = parseFloat(strVal);
-
-    if (isNaN(numberVal)) return 0;
-    
-    if (strVal.includes('K')) return numberVal * 1000;
-    if (strVal.includes('M')) return numberVal * 1000000;
-    if (strVal.includes('H')) return numberVal * 100;
-    
-    return numberVal;
-  }
-
   compute() {
     let computation;
-    const prev = this.parseSpecialValue(this.previousOperand);
-    const current = this.parseSpecialValue(this.currentOperand);
+    const prev = parseFloat(this.previousOperand);
+    const current = parseFloat(this.currentOperand);
 
+    // Guard clause: if either is not a number, don't compute
     if (isNaN(prev) || isNaN(current)) return;
 
     switch (this.operation) {
-      case '+':
-        computation = prev + current;
-        break;
-      case '-':
-        computation = prev - current;
-        break;
-      case '*':
-        computation = prev * current;
-        break;
-      case '÷':
-        computation = prev / current;
-        break;
-      default:
-        return;
+      case '+': computation = prev + current; break;
+      case '-': computation = prev - current; break;
+      case '×': computation = prev * current; break;
+      case '÷': computation = prev / current; break;
+      default: return;
     }
-    this.currentOperand = computation;
+
+    this.currentOperand = computation.toString();
     this.operation = undefined;
     this.previousOperand = '';
   }
 
+  /**
+   * Formats numbers with commas (e.g., 1000000 -> 1,000,000)
+   * while preserving decimal points as they are being typed.
+   */
   getDisplayNumber(number) {
     const stringNumber = number.toString();
-    // Use regex to split numbers from letters (e.g. "500" vs "K")
-    const match = stringNumber.match(/^([\d.]+)([KMH])?$/);
-    
-    if(!match) return stringNumber;
-
-    const integerDigits = parseFloat(match[1].split('.')[0]);
-    const decimalDigits = match[1].split('.')[1];
-    const suffix = match[2] || ''; // K, M, H or empty
+    // Split into integer and decimal parts
+    const integerDigits = parseFloat(stringNumber.split('.')[0]);
+    const decimalDigits = stringNumber.split('.')[1];
 
     let integerDisplay;
     if (isNaN(integerDigits)) {
       integerDisplay = '';
     } else {
+      // Format integers with commas
       integerDisplay = integerDigits.toLocaleString('en', { maximumFractionDigits: 0 });
     }
 
     if (decimalDigits != null) {
-      return `${integerDisplay}.${decimalDigits}${suffix}`;
+      return `${integerDisplay}.${decimalDigits}`;
     } else {
-      return `${integerDisplay}${suffix}`;
+      return integerDisplay;
     }
   }
 
   updateDisplay() {
-    this.currentOperandTextElement.innerText =
-      this.getDisplayNumber(this.currentOperand);
+    this.currentOperandElement.innerText = this.getDisplayNumber(this.currentOperand);
+    
     if (this.operation != null) {
-      this.previousOperandTextElement.innerText =
+      this.previousOperandElement.innerText = 
         `${this.getDisplayNumber(this.previousOperand)} ${this.operation}`;
     } else {
-      this.previousOperandTextElement.innerText = '';
+      this.previousOperandElement.innerText = '';
     }
   }
 }
 
-const numberButtons = document.querySelectorAll('[data-number]');
-const operationButtons = document.querySelectorAll('[data-operation]');
-const specialOperationButtons = document.querySelectorAll('[data-specialOperation]');
-const equalsButton = document.querySelector('[data-equals]');
-const deleteButton = document.querySelector('[data-delete]');
-const allClearButton = document.querySelector('[data-all-clear]');
-const previousOperandTextElement = document.querySelector('[data-previous-operand]');
-const currentOperandTextElement = document.querySelector('[data-current-operand]');
+// --- DOM Elements & Initialization ---
+const UI = {
+  numberBtns: document.querySelectorAll('[data-number]'),
+  operationBtns: document.querySelectorAll('[data-operation]'),
+  specialBtns: document.querySelectorAll('[data-special]'),
+  equalsBtn: document.querySelector('[data-equals]'),
+  deleteBtn: document.querySelector('[data-delete]'),
+  clearBtn: document.querySelector('[data-all-clear]'),
+  prevOperand: document.querySelector('[data-previous-operand]'),
+  currOperand: document.querySelector('[data-current-operand]')
+};
 
-const calculator = new Calculator(previousOperandTextElement, currentOperandTextElement);
+const calculator = new Calculator(UI.prevOperand, UI.currOperand);
 
-numberButtons.forEach(button => {
+// --- Event Listeners ---
+UI.numberBtns.forEach(button => {
   button.addEventListener('click', () => {
     calculator.appendNumber(button.innerText);
     calculator.updateDisplay();
   });
 });
 
-specialOperationButtons.forEach(button => {
-  button.addEventListener('click', () => {
-    calculator.chooseSpecialOperation(button.innerText);
-    calculator.updateDisplay();
-  });
-});
-
-operationButtons.forEach(button => {
+UI.operationBtns.forEach(button => {
   button.addEventListener('click', () => {
     calculator.chooseOperation(button.innerText);
     calculator.updateDisplay();
   });
 });
 
-equalsButton.addEventListener('click', () => {
+UI.specialBtns.forEach(button => {
+  button.addEventListener('click', () => {
+    // Pass the multiplier (H, K, or M) from the dataset or innerText
+    calculator.applyMultiplier(button.innerText);
+    calculator.updateDisplay();
+  });
+});
+
+UI.equalsBtn.addEventListener('click', () => {
   calculator.compute();
   calculator.updateDisplay();
 });
 
-allClearButton.addEventListener('click', () => {
+UI.clearBtn.addEventListener('click', () => {
   calculator.clear();
   calculator.updateDisplay();
 });
 
-deleteButton.addEventListener('click', () => {
+UI.deleteBtn.addEventListener('click', () => {
   calculator.delete();
   calculator.updateDisplay();
 });
